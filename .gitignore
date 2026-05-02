@@ -1,0 +1,32 @@
+# Build output
+build/
+
+# VS Code
+.vscode/
+
+# Compiled binaries
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.obj
+*.lib
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Qt generated files
+*_autogen/
+moc_*.cpp
+ui_*.h
+*.moc
+
+# MSVC
+*.vc.db
+*.vc.opendb
+
+pokeemerald-master/
+pokeemerald-expansion-master/
