@@ -218,9 +218,9 @@ QString mapTilesCompressedToHexStringFRSec2(int offset, int dummy,
 
 QString colorToPalText(const std::array<QColor, 16>& colors)
 {
-    QString text = "JASC-PAL\r\n0100\r\n16\r\n";
+    QString text = "JASC-PAL\n0100\n16\n";
     for (const QColor& c : colors) {
-        text += QString("%1 %2 %3\r\n").arg(c.red()).arg(c.green()).arg(c.blue());
+        text += QString("%1 %2 %3\n").arg(c.red()).arg(c.green()).arg(c.blue());
     }
     return text;
 }

@@ -1022,12 +1022,12 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         QString pname = QString("%1").arg(p, 2, 10, QChar('0'));
         {
             QFile pf(primaryDir + "palettes/" + pname + ".pal");
-            (void)pf.open(QIODevice::WriteOnly | QIODevice::Text);
+            (void)pf.open(QIODevice::WriteOnly);
             pf.write(colorToPalText(pals[p]).toUtf8());
         }
         {
             QFile pf(secondaryDir + "palettes/" + pname + ".pal");
-            (void)pf.open(QIODevice::WriteOnly | QIODevice::Text);
+            (void)pf.open(QIODevice::WriteOnly);
             pf.write(colorToPalText(pals[p]).toUtf8());
         }
     }
