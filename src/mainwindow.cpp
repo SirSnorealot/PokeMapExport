@@ -686,12 +686,23 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
             g_secondaryTilesImg = readHex(rom, g_secondaryImagePointer, 16384);
     }
 
-    // Secondary block/behavior sizes from INI
+    // Secondary block/behavior sizes
+    int secMetatileMax = isFR ? 384 : 512;
     int numTiles = romTilesetTileCount(g_header,
                                        QString::number(g_secondaryTilesetPointer, 16).toUpper());
+    if (numTiles <= 0)
+        numTiles = secMetatileMax;
 
-    g_secondaryBlocks = readHex(rom, g_secondaryBlockSetPointer, (numTiles + 1) * 16);
-    g_secondaryBehaviors = readHex(rom, g_secondaryBehaviourPointer, (numTiles + 1) * 2);
+    if (isFR)
+    {
+        g_secondaryBlocks    = readHex(rom, g_secondaryBlockSetPointer,  secMetatileMax * 16);
+        g_secondaryBehaviors = readHex(rom, g_secondaryBehaviourPointer, secMetatileMax * 4);
+    }
+    else
+    {
+        g_secondaryBlocks    = readHex(rom, g_secondaryBlockSetPointer,  numTiles * 16);
+        g_secondaryBehaviors = readHex(rom, g_secondaryBehaviourPointer, numTiles * 2);
+    }
 }
 
 // ---- Export -----------------------------------------------------------------------
