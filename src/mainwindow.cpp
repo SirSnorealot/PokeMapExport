@@ -952,14 +952,14 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         };
 
         QString outputGraphics;
-        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Primary[] = INCGFX_U32(\"data/tilesets/primary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(priNumTiles) + " -Wnum_tiles\");\n\n";
         outputGraphics += "const u16 gTilesetPalettes_" + enBM + "_Primary[][16] =\n{\n";
         outputGraphics += palLines("primary");
         outputGraphics += "};\n\n";
-        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Secondary[] = INCGFX_U32(\"data/tilesets/secondary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(secNumTiles) + " -Wnum_tiles\");\n\n";
+        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Primary[] = INCGFX_U32(\"data/tilesets/primary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(priNumTiles) + " -Wnum_tiles\");\n\n";
         outputGraphics += "const u16 gTilesetPalettes_" + enBM + "_Secondary[][16] =\n{\n";
         outputGraphics += palLines("secondary");
         outputGraphics += "};\n\n";
+        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Secondary[] = INCGFX_U32(\"data/tilesets/secondary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(secNumTiles) + " -Wnum_tiles\");\n\n";
 
         QFile gf(folder + "/src/data/tilesets/graphics.h");
         (void)gf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
