@@ -889,8 +889,7 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
 
         QString behaviorscomb = behaviors1 + behaviors2;
         QString conbehaviors1 = behaviorscomb.left((512 * 2) * 2);
-        QString conbehaviors2 = behaviorscomb.mid((512 * 2) * 2,
-                                                  behaviorscomb.length() - (512 * 2) * 2 - 1);
+        QString conbehaviors2 = behaviorscomb.mid((512 * 2) * 2);
 
         QFile::remove(base + "_PrimaryBehaviors.bin");
         QFile::remove(base + "_SecondaryBehaviors.bin");
