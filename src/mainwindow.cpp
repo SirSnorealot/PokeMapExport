@@ -323,10 +323,8 @@ void MainWindow::onMapSelectionChanged(QTreeWidgetItem *current, QTreeWidgetItem
         palettes[numPriPals + i] = loadPalette(secPalRaw.mid(i * 32, 32));
 
     // ---- Combined metatile data -------------------------------------------------
-    // allMetatiles covers the FULL range (priMetatileMax + secMetatileMax) so that
-    // map cell metatile IDs index correctly regardless of actual used count.
     QByteArray allMetatiles = primaryBlks + secondaryBlks;
-    // Display only actually-used blocks in the Blocks tab
+
     int numMetatiles = numPriMetatiles + numSecMetatiles;
 
     // ---- Tiles tab --------------------------------------------------------------
@@ -473,16 +471,11 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
     int weatherVal = readHex(rom, hp + 22, 1).toInt(nullptr, 16);
     int mapTypeVal = readHex(rom, hp + 23, 1).toInt(nullptr, 16);
 
-    // In Emerald: hp+26 = flags byte (bits 0-3: cycling/escaping/running/show_name), hp+27 = battle_scene
-    // In FR/LG:   hp+26 = show_name (full byte), hp+27 = battle_type
     bool allowCycling, allowEscaping, allowRunning, showMapName;
     int battleVal;
     if (isFR)
     {
-        // FR 0x18: bikingAllowed (full byte)
-        // FR 0x19: allowEscaping:1, allowRunning:1, showMapName:6
-        // FR 0x1A: floorNum (unused here)
-        // FR 0x1B: battleType
+
         int bikingAllowed = readHex(rom, hp + 24, 1).toInt(nullptr, 16);
         int flagsByte = readHex(rom, hp + 25, 1).toInt(nullptr, 16);
         allowCycling = bikingAllowed > 0;
@@ -595,7 +588,6 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
     g_borderData = readHex(rom, g_borderPointer, (g_borderHeight * g_borderWidth) * 2);
     g_mapPermData = readHex(rom, g_mapDataPointer, (g_mapHeight * g_mapWidth) * 2);
 
-    // outputtextFooter is no longer written as layout.inc;
     // the layout entry is added to layouts.json in onExportClicked.
     outputtextFooter = QString();
 
@@ -883,19 +875,39 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         writeHex(base + "_PrimaryPal.bin", 0, pals1);
         writeHex(base + "_SecondaryPal.bin", 0, pals2);
 
-        // Behavior conversion (FR uses 4-byte entries, we extract bytes [0] and [2])
         QFileInfo info3(base + "_PrimaryBehaviors.bin");
         QFileInfo info4(base + "_SecondaryBehaviors.bin");
         QString behaviors1, behaviors2;
 
-        for (qint64 loopvar = 0; loopvar < info3.size(); loopvar += 4)
         {
-            behaviors1 += readHex(base + "_PrimaryBehaviors.bin", (int)loopvar, 1).right(2);
-            behaviors1 += readHex(base + "_PrimaryBehaviors.bin", (int)loopvar + 2, 1).right(2);
+            QByteArray raw = QByteArray::fromHex(
+                readHex(base + "_PrimaryBehaviors.bin", 0, (int)info3.size()).toLatin1());
+            for (int i = 0; i + 3 < raw.size(); i += 4)
+            {
+                uint8_t b0 = static_cast<uint8_t>(raw[i]);
+                uint8_t b1 = static_cast<uint8_t>(raw[i + 1]);
+                uint8_t b3 = static_cast<uint8_t>(raw[i + 3]);
+                uint8_t hi = uint8_t(((b1 >> 1) & 0x3)        // terrain  → bits 8-9
+                                   | ((b3 & 0x3) << 2)         // encounter→ bits 10-11
+                                   | (((b3 >> 5) & 0x3) << 4));// layer    → bits 12-13
+                behaviors1 += QString("%1").arg(b0, 2, 16, QChar('0')).toUpper();
+                behaviors1 += QString("%1").arg(hi, 2, 16, QChar('0')).toUpper();
+            }
         }
-        for (qint64 loopvar = 0; loopvar < info4.size(); loopvar += 2)
         {
-            behaviors2 += readHex(base + "_SecondaryBehaviors.bin", (int)loopvar, 1).right(2);
+            QByteArray raw = QByteArray::fromHex(
+                readHex(base + "_SecondaryBehaviors.bin", 0, (int)info4.size()).toLatin1());
+            for (int i = 0; i + 3 < raw.size(); i += 4)
+            {
+                uint8_t b0 = static_cast<uint8_t>(raw[i]);
+                uint8_t b1 = static_cast<uint8_t>(raw[i + 1]);
+                uint8_t b3 = static_cast<uint8_t>(raw[i + 3]);
+                uint8_t hi = uint8_t(((b1 >> 1) & 0x3)
+                                   | ((b3 & 0x3) << 2)
+                                   | (((b3 >> 5) & 0x3) << 4));
+                behaviors2 += QString("%1").arg(b0, 2, 16, QChar('0')).toUpper();
+                behaviors2 += QString("%1").arg(hi, 2, 16, QChar('0')).toUpper();
+            }
         }
 
         QString behaviorscomb = behaviors1 + behaviors2;

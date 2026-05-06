@@ -24,9 +24,10 @@ QString readHex(const QString& filePath, int start, int length)
 void writeHex(const QString& filePath, int start, const QString& data)
 {
     QFile f(filePath);
-    if (!f.open(QIODevice::ReadWrite))
+    if (!f.open(QIODevice::WriteOnly))
         return;
-    f.seek(start);
+    if (start > 0)
+        f.seek(start);
     f.write(hexStringToByteArray(data));
     f.close();
 }
