@@ -494,10 +494,11 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
     }
 
     // ---- Build map.json ----
+    const QString layoutId = QString::number(static_cast<uint>(g_mapFooter), 16).toUpper();
     outputtext = "{\n";
     outputtext += "  \"id\": \"MAP_" + enBM + "\",\n";
     outputtext += "  \"name\": \"" + enBM + "\",\n";
-    outputtext += "  \"layout\": \"LAYOUT_" + enBM + "\",\n";
+    outputtext += "  \"layout\": \"LAYOUT_" + layoutId + "\",\n";
     outputtext += "  \"music\": \"" + enumName("music", musicVal) + "\",\n";
     outputtext += "  \"region_map_section\": \"" + enumName("mapsec", regionSec) + "\",\n";
     outputtext += "  \"requires_flash\": " + QString(caveVal ? "true" : "false") + ",\n";
@@ -762,12 +763,17 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
     const QString enBM = g_exportName + "_" + QString::number(g_mapBank) + "_" + QString::number(g_mapNumber);
     const QString priTsId = QString::number(static_cast<uint>(g_primaryTilesetPointer), 16).toUpper();
     const QString secTsId = QString::number(static_cast<uint>(g_secondaryTilesetPointer), 16).toUpper();
+    const QString layoutId = QString::number(static_cast<uint>(g_mapFooter), 16).toUpper();
 
     // ---- Write layout binary files ----
-    QString layoutDir = folder + "/data/layouts/" + enBM + "/";
-    QDir().mkpath(layoutDir);
-    writeHex(layoutDir + "border.bin", 0, g_borderData);
-    writeHex(layoutDir + "map.bin", 0, g_mapPermData);
+    QString layoutDir = folder + "/data/layouts/" + layoutId + "/";
+    const bool layoutExists = QDir(layoutDir).exists();
+    if (!layoutExists)
+    {
+        QDir().mkpath(layoutDir);
+        writeHex(layoutDir + "border.bin", 0, g_borderData);
+        writeHex(layoutDir + "map.bin", 0, g_mapPermData);
+    }
 
     // ---- Update data/layouts/layouts.json ----
     {
@@ -788,16 +794,29 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         if (!layoutsJson.contains("layouts_table_label"))
             layoutsJson["layouts_table_label"] = QString("gMapLayouts");
 
-        QJsonObject layoutEntry;
-        layoutEntry["id"] = "LAYOUT_" + enBM;
-        layoutEntry["name"] = enBM + "_Layout";
-        layoutEntry["width"] = g_mapWidth;
-        layoutEntry["height"] = g_mapHeight;
-        layoutEntry["primary_tileset"] = "gTileset_" + priTsId;
-        layoutEntry["secondary_tileset"] = "gTileset_" + secTsId;
-        layoutEntry["border_filepath"] = "data/layouts/" + enBM + "/border.bin";
-        layoutEntry["blockdata_filepath"] = "data/layouts/" + enBM + "/map.bin";
-        layoutsArray.append(layoutEntry);
+        const QString layoutEntryId = "LAYOUT_" + layoutId;
+        bool layoutAlreadyInJson = false;
+        for (int li = 0; li < layoutsArray.size(); li++)
+        {
+            if (layoutsArray[li].toObject()["id"].toString() == layoutEntryId)
+            {
+                layoutAlreadyInJson = true;
+                break;
+            }
+        }
+        if (!layoutAlreadyInJson)
+        {
+            QJsonObject layoutEntry;
+            layoutEntry["id"] = layoutEntryId;
+            layoutEntry["name"] = layoutId + "_Layout";
+            layoutEntry["width"] = g_mapWidth;
+            layoutEntry["height"] = g_mapHeight;
+            layoutEntry["primary_tileset"] = "gTileset_" + priTsId;
+            layoutEntry["secondary_tileset"] = "gTileset_" + secTsId;
+            layoutEntry["border_filepath"] = "data/layouts/" + layoutId + "/border.bin";
+            layoutEntry["blockdata_filepath"] = "data/layouts/" + layoutId + "/map.bin";
+            layoutsArray.append(layoutEntry);
+        }
         layoutsJson["layouts"] = layoutsArray;
 
         QJsonDocument outDoc(layoutsJson);
