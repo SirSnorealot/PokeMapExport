@@ -186,11 +186,13 @@ void MainWindow::loadBanksAndMaps()
 
         QString origBankPtrStr = romBankPointer(g_header, bankIdx);
         int numMaps = romMapsInBank(g_header, bankIdx);
-
         int bankPointer = readInt32LE(g_loadedROM, g_mapBankPointers + (bankIdx * 4)) - 0x8000000;
 
+        bool bankConfigured = !origBankPtrStr.isEmpty() && origBankPtrStr.toInt(nullptr, 16) == bankPointer;
+        int maxMaps = bankConfigured ? (numMaps + 1) : 300;
+
         int x = 0;
-        while (x <= 299)
+        while (x < maxMaps)
         {
             QString fourB = readHex(g_loadedROM, bankPointer + (x * 4), 4);
             if (fourB == "F7F7F7F7")
@@ -222,9 +224,6 @@ void MainWindow::loadBanksAndMaps()
             mapItem->setText(0, mapName);
 
             x++;
-
-            if (!origBankPtrStr.isEmpty() && origBankPtrStr.toInt(nullptr, 16) == bankPointer && numMaps == x)
-                break;
         }
 
         bankIdx++;
@@ -601,13 +600,15 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
     else
         g_primaryBehaviourPointer = readROMPointer(rom, g_primaryTilesetPointer + 16);
 
-    outputprimaryts = "const struct Tileset gTileset_" + enBM + "_Primary =\n{\n";
+    const QString priTsId = QString::number(static_cast<uint>(g_primaryTilesetPointer), 16).toUpper();
+
+    outputprimaryts = "const struct Tileset gTileset_" + priTsId + " =\n{\n";
     outputprimaryts += "    .isCompressed = TRUE,\n";
     outputprimaryts += "    .isSecondary = FALSE,\n";
-    outputprimaryts += "    .tiles = gTilesetTiles_" + enBM + "_Primary,\n";
-    outputprimaryts += "    .palettes = gTilesetPalettes_" + enBM + "_Primary,\n";
-    outputprimaryts += "    .metatiles = gMetatiles_" + enBM + "_Primary,\n";
-    outputprimaryts += "    .metatileAttributes = gMetatileAttributes_" + enBM + "_Primary,\n";
+    outputprimaryts += "    .tiles = gTilesetTiles_" + priTsId + ",\n";
+    outputprimaryts += "    .palettes = gTilesetPalettes_" + priTsId + ",\n";
+    outputprimaryts += "    .metatiles = gMetatiles_" + priTsId + ",\n";
+    outputprimaryts += "    .metatileAttributes = gMetatileAttributes_" + priTsId + ",\n";
     outputprimaryts += "    .callback = NULL,\n};\n\n";
 
     // Primary tile data
@@ -652,13 +653,15 @@ void MainWindow::doOutput(QString &outputtext, QString &outputtextFooter,
     else
         g_secondaryBehaviourPointer = readROMPointer(rom, g_secondaryTilesetPointer + 16);
 
-    outputsecondaryts = "const struct Tileset gTileset_" + enBM + "_Secondary =\n{\n";
+    const QString secTsId = QString::number(static_cast<uint>(g_secondaryTilesetPointer), 16).toUpper();
+
+    outputsecondaryts = "const struct Tileset gTileset_" + secTsId + " =\n{\n";
     outputsecondaryts += "    .isCompressed = TRUE,\n";
     outputsecondaryts += "    .isSecondary = TRUE,\n";
-    outputsecondaryts += "    .tiles = gTilesetTiles_" + enBM + "_Secondary,\n";
-    outputsecondaryts += "    .palettes = gTilesetPalettes_" + enBM + "_Secondary,\n";
-    outputsecondaryts += "    .metatiles = gMetatiles_" + enBM + "_Secondary,\n";
-    outputsecondaryts += "    .metatileAttributes = gMetatileAttributes_" + enBM + "_Secondary,\n";
+    outputsecondaryts += "    .tiles = gTilesetTiles_" + secTsId + ",\n";
+    outputsecondaryts += "    .palettes = gTilesetPalettes_" + secTsId + ",\n";
+    outputsecondaryts += "    .metatiles = gMetatiles_" + secTsId + ",\n";
+    outputsecondaryts += "    .metatileAttributes = gMetatileAttributes_" + secTsId + ",\n";
     outputsecondaryts += "    .callback = NULL,\n};\n\n";
 
     g_secondaryPals = readHex(rom, g_secondaryPalPointer, 13 * (16 * 2));
@@ -757,14 +760,8 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
     doOutput(outputtext, outputtextFooter, outputprimaryts, outputsecondaryts);
 
     const QString enBM = g_exportName + "_" + QString::number(g_mapBank) + "_" + QString::number(g_mapNumber);
-
-    // ---- Write src/data/tilesets/headers.h (C struct format) ----
-    QDir().mkpath(folder + "/src/data/tilesets/");
-    {
-        QFile hf(folder + "/src/data/tilesets/headers.h");
-        (void)hf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
-        hf.write((outputprimaryts + outputsecondaryts).toUtf8());
-    }
+    const QString priTsId = QString::number(static_cast<uint>(g_primaryTilesetPointer), 16).toUpper();
+    const QString secTsId = QString::number(static_cast<uint>(g_secondaryTilesetPointer), 16).toUpper();
 
     // ---- Write layout binary files ----
     QString layoutDir = folder + "/data/layouts/" + enBM + "/";
@@ -796,8 +793,8 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         layoutEntry["name"] = enBM + "_Layout";
         layoutEntry["width"] = g_mapWidth;
         layoutEntry["height"] = g_mapHeight;
-        layoutEntry["primary_tileset"] = "gTileset_" + enBM + "_Primary";
-        layoutEntry["secondary_tileset"] = "gTileset_" + enBM + "_Secondary";
+        layoutEntry["primary_tileset"] = "gTileset_" + priTsId;
+        layoutEntry["secondary_tileset"] = "gTileset_" + secTsId;
         layoutEntry["border_filepath"] = "data/layouts/" + enBM + "/border.bin";
         layoutEntry["blockdata_filepath"] = "data/layouts/" + enBM + "/map.bin";
         layoutsArray.append(layoutEntry);
@@ -920,22 +917,52 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         writeHex(base + "_SecondaryBehaviors.bin", 0, conbehaviors2);
     }
 
-    // ---- Create tileset directories ----
-    QString primaryDir = folder + "/data/tilesets/primary/" + enBM + "/";
-    QString secondaryDir = folder + "/data/tilesets/secondary/" + enBM + "/";
-    QDir().mkpath(primaryDir + "palettes/");
-    QDir().mkpath(secondaryDir + "palettes/");
+    // ---- Create tileset directories (skip if already exported) ----
+    QString primaryDir = folder + "/data/tilesets/primary/" + priTsId + "/";
+    QString secondaryDir = folder + "/data/tilesets/secondary/" + secTsId + "/";
+    const bool priTsExists = QDir(primaryDir).exists();
+    const bool secTsExists = QDir(secondaryDir).exists();
+
+    if (!priTsExists)
+        QDir().mkpath(primaryDir + "palettes/");
+    if (!secTsExists)
+        QDir().mkpath(secondaryDir + "palettes/");
+
+    // ---- Write src/data/tilesets/headers.h (C struct format) ----
+    QDir().mkpath(folder + "/src/data/tilesets/");
+    {
+        QString hdrOut;
+        if (!priTsExists)
+            hdrOut += outputprimaryts;
+        if (!secTsExists)
+            hdrOut += outputsecondaryts;
+        if (!hdrOut.isEmpty())
+        {
+            QFile hf(folder + "/src/data/tilesets/headers.h");
+            (void)hf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
+            hf.write(hdrOut.toUtf8());
+        }
+    }
 
     // ---- src/data/tilesets/metatiles.h (C INCBIN_U16 format) ----
     {
         QString outputMetatiles;
-        outputMetatiles += "const u16 gMetatiles_" + enBM + "_Primary[] = INCBIN_U16(\"data/tilesets/primary/" + enBM + "/metatiles.bin\");\n";
-        outputMetatiles += "const u16 gMetatileAttributes_" + enBM + "_Primary[] = INCBIN_U16(\"data/tilesets/primary/" + enBM + "/metatile_attributes.bin\");\n\n";
-        outputMetatiles += "const u16 gMetatiles_" + enBM + "_Secondary[] = INCBIN_U16(\"data/tilesets/secondary/" + enBM + "/metatiles.bin\");\n";
-        outputMetatiles += "const u16 gMetatileAttributes_" + enBM + "_Secondary[] = INCBIN_U16(\"data/tilesets/secondary/" + enBM + "/metatile_attributes.bin\");\n\n";
-        QFile mf(folder + "/src/data/tilesets/metatiles.h");
-        (void)mf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
-        mf.write(outputMetatiles.toUtf8());
+        if (!priTsExists)
+        {
+            outputMetatiles += "const u16 gMetatiles_" + priTsId + "[] = INCBIN_U16(\"data/tilesets/primary/" + priTsId + "/metatiles.bin\");\n";
+            outputMetatiles += "const u16 gMetatileAttributes_" + priTsId + "[] = INCBIN_U16(\"data/tilesets/primary/" + priTsId + "/metatile_attributes.bin\");\n\n";
+        }
+        if (!secTsExists)
+        {
+            outputMetatiles += "const u16 gMetatiles_" + secTsId + "[] = INCBIN_U16(\"data/tilesets/secondary/" + secTsId + "/metatiles.bin\");\n";
+            outputMetatiles += "const u16 gMetatileAttributes_" + secTsId + "[] = INCBIN_U16(\"data/tilesets/secondary/" + secTsId + "/metatile_attributes.bin\");\n\n";
+        }
+        if (!outputMetatiles.isEmpty())
+        {
+            QFile mf(folder + "/src/data/tilesets/metatiles.h");
+            (void)mf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
+            mf.write(outputMetatiles.toUtf8());
+        }
     }
 
     // ---- src/data/tilesets/graphics.h (C INCGFX_U32 / INCGFX_U16 format) ----
@@ -960,32 +987,40 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         bool useFastSmol = (romConfigString(g_header, "fastSmol", "true") == "true");
         QString lzExt = useFastSmol ? ".4bpp.fastSmol" : ".4bpp.lz";
 
-        auto palLines = [&](const QString &side)
+        auto palLines = [&](const QString &side, const QString &tsId)
         {
             QString out;
             for (int p = 0; p <= 15; p++)
             {
                 out += QString("\tINCGFX_U16(\"data/tilesets/%1/%2/palettes/%3.pal\", \".gbapal\"),\n")
                            .arg(side)
-                           .arg(enBM)
+                           .arg(tsId)
                            .arg(p, 2, 10, QChar('0'));
             }
             return out;
         };
 
         QString outputGraphics;
-        outputGraphics += "const u16 gTilesetPalettes_" + enBM + "_Primary[][16] =\n{\n";
-        outputGraphics += palLines("primary");
-        outputGraphics += "};\n\n";
-        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Primary[] = INCGFX_U32(\"data/tilesets/primary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(priNumTiles) + " -Wnum_tiles\");\n\n";
-        outputGraphics += "const u16 gTilesetPalettes_" + enBM + "_Secondary[][16] =\n{\n";
-        outputGraphics += palLines("secondary");
-        outputGraphics += "};\n\n";
-        outputGraphics += "const u32 gTilesetTiles_" + enBM + "_Secondary[] = INCGFX_U32(\"data/tilesets/secondary/" + enBM + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(secNumTiles) + " -Wnum_tiles\");\n\n";
-
-        QFile gf(folder + "/src/data/tilesets/graphics.h");
-        (void)gf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
-        gf.write(outputGraphics.toUtf8());
+        if (!priTsExists)
+        {
+            outputGraphics += "const u16 gTilesetPalettes_" + priTsId + "[][16] =\n{\n";
+            outputGraphics += palLines("primary", priTsId);
+            outputGraphics += "};\n\n";
+            outputGraphics += "const u32 gTilesetTiles_" + priTsId + "[] = INCGFX_U32(\"data/tilesets/primary/" + priTsId + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(priNumTiles) + " -Wnum_tiles\");\n\n";
+        }
+        if (!secTsExists)
+        {
+            outputGraphics += "const u16 gTilesetPalettes_" + secTsId + "[][16] =\n{\n";
+            outputGraphics += palLines("secondary", secTsId);
+            outputGraphics += "};\n\n";
+            outputGraphics += "const u32 gTilesetTiles_" + secTsId + "[] = INCGFX_U32(\"data/tilesets/secondary/" + secTsId + "/tiles.png\", \"" + lzExt + "\", \"-num_tiles " + QString::number(secNumTiles) + " -Wnum_tiles\");\n\n";
+        }
+        if (!outputGraphics.isEmpty())
+        {
+            QFile gf(folder + "/src/data/tilesets/graphics.h");
+            (void)gf.open(QIODevice::Append | QIODevice::WriteOnly | QIODevice::Text);
+            gf.write(outputGraphics.toUtf8());
+        }
     }
 
     // ---- Move block/behavior files ----
@@ -994,10 +1029,26 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         QFile::remove(dst);
         QFile::rename(src, dst);
     };
-    moveFile(base + "_PrimaryBlocks.bin", primaryDir + "metatiles.bin");
-    moveFile(base + "_PrimaryBehaviors.bin", primaryDir + "metatile_attributes.bin");
-    moveFile(base + "_SecondaryBlocks.bin", secondaryDir + "metatiles.bin");
-    moveFile(base + "_SecondaryBehaviors.bin", secondaryDir + "metatile_attributes.bin");
+    if (!priTsExists)
+    {
+        moveFile(base + "_PrimaryBlocks.bin", primaryDir + "metatiles.bin");
+        moveFile(base + "_PrimaryBehaviors.bin", primaryDir + "metatile_attributes.bin");
+    }
+    else
+    {
+        QFile::remove(base + "_PrimaryBlocks.bin");
+        QFile::remove(base + "_PrimaryBehaviors.bin");
+    }
+    if (!secTsExists)
+    {
+        moveFile(base + "_SecondaryBlocks.bin", secondaryDir + "metatiles.bin");
+        moveFile(base + "_SecondaryBehaviors.bin", secondaryDir + "metatile_attributes.bin");
+    }
+    else
+    {
+        QFile::remove(base + "_SecondaryBlocks.bin");
+        QFile::remove(base + "_SecondaryBehaviors.bin");
+    }
 
     // ---- Read palettes from bin files and write .pal text ----
     std::array<std::array<QColor, 16>, 16> pals;
@@ -1039,15 +1090,21 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
     QFile::remove(base + "_PrimaryPal.bin");
     QFile::remove(base + "_SecondaryPal.bin");
 
-    for (int p = 0; p <= 15; p++)
+    if (!priTsExists)
     {
-        QString pname = QString("%1").arg(p, 2, 10, QChar('0'));
+        for (int p = 0; p <= 15; p++)
         {
+            QString pname = QString("%1").arg(p, 2, 10, QChar('0'));
             QFile pf(primaryDir + "palettes/" + pname + ".pal");
             (void)pf.open(QIODevice::WriteOnly);
             pf.write(colorToPalText(pals[p]).toUtf8());
         }
+    }
+    if (!secTsExists)
+    {
+        for (int p = 0; p <= 15; p++)
         {
+            QString pname = QString("%1").arg(p, 2, 10, QChar('0'));
             QFile pf(secondaryDir + "palettes/" + pname + ".pal");
             (void)pf.open(QIODevice::WriteOnly);
             pf.write(colorToPalText(pals[p]).toUtf8());
@@ -1094,8 +1151,10 @@ void MainWindow::exportMap(const QString &folder, int bankIdx, int mapIdx)
         img.save(pngPath, "PNG");
     };
 
-    saveTilePng(base + "_PrimaryTiles.bin", primaryDir + "tiles.png");
-    saveTilePng(base + "_SecondaryTiles.bin", secondaryDir + "tiles.png");
+    if (!priTsExists)
+        saveTilePng(base + "_PrimaryTiles.bin", primaryDir + "tiles.png");
+    if (!secTsExists)
+        saveTilePng(base + "_SecondaryTiles.bin", secondaryDir + "tiles.png");
 
     // Clean up temp tile files
     QFile::remove(base + "_PrimaryTiles.bin");
@@ -1134,8 +1193,11 @@ void MainWindow::onExportAllClicked()
         int numMaps = romMapsInBank(g_header, bankIdx);
         int bankPointer = readInt32LE(g_loadedROM, g_mapBankPointers + (bankIdx * 4)) - 0x8000000;
 
+        bool bankConfigured = !origBankPtrStr.isEmpty() && origBankPtrStr.toInt(nullptr, 16) == bankPointer;
+        int maxMaps = bankConfigured ? (numMaps + 1) : 300;
+
         int x = 0;
-        while (x <= 299)
+        while (x < maxMaps)
         {
             QString fourB = readHex(g_loadedROM, bankPointer + (x * 4), 4);
             if (fourB == "F7F7F7F7")
@@ -1145,8 +1207,6 @@ void MainWindow::onExportAllClicked()
                 exportMap(folder, bankIdx, x);
 
             x++;
-            if (!origBankPtrStr.isEmpty() && origBankPtrStr.toInt(nullptr, 16) == bankPointer && numMaps == x)
-                break;
         }
 
         bankIdx++;
